@@ -1,0 +1,156 @@
+/* Citizen Dashboard specifics */
+.welcome-actions .btn:hover { transform: translateY(-2px); }
+
+.issue-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.issue-card {
+  background: white;
+  border: 2px solid #c5d4e8;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 16px rgba(10, 22, 40, 0.09);
+}
+.issue-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(18, 98, 196, 0.15); border-color: var(--blue-500); }
+
+.issue-img {
+  height: 140px;
+  background: linear-gradient(135deg, #64748b, #334155);
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  position: relative;
+}
+.issue-img.road { background: linear-gradient(135deg, #78716c, #44403c); }
+.issue-img.drain { background: linear-gradient(135deg, #0e7490, #155e75); }
+.issue-img.light { background: linear-gradient(135deg, #ca8a04, #a16207); }
+.issue-img.garbage { background: linear-gradient(135deg, #65a30d, #3f6212); }
+
+.issue-body { padding: 1rem; }
+.issue-body h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+.issue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+.meta-line {
+  font-size: 0.82rem;
+  color: var(--slate-500);
+  margin-bottom: 0.25rem;
+}
+
+.action-card {
+  background: linear-gradient(135deg, #fff7ed, #fffbeb);
+  border: 2px solid #fb923c;
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 0.75rem;
+  animation: fadeUp 0.4s ease;
+  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.12);
+}
+.action-card h3 { margin-bottom: 0.35rem; }
+.action-card .status-line {
+  font-size: 0.9rem;
+  color: var(--slate-600);
+  margin-bottom: 1rem;
+}
+.action-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.nearby-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 560px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+.nearby-item {
+  background: white;
+  border: 2px solid #c5d4e8;
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  transition: all var(--transition);
+  box-shadow: 0 3px 14px rgba(10, 22, 40, 0.07);
+}
+.nearby-item:hover { border-color: var(--blue-500); box-shadow: 0 8px 22px rgba(18, 98, 196, 0.12); }
+.nearby-item h4 { margin-bottom: 0.35rem; }
+.boost-note {
+  font-size: 0.8rem;
+  color: var(--slate-500);
+  margin: 0.5rem 0;
+}
+
+.resolved-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.resolved-card {
+  background: white;
+  border: 2px solid #c5d4e8;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(10, 22, 40, 0.09);
+}
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100px;
+}
+.before-after div {
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.before-after .before { background: linear-gradient(135deg, #78716c, #57534e); }
+.before-after .after { background: linear-gradient(135deg, #059669, #047857); }
+.resolved-card .body { padding: 1rem; }
+
+.media-preview {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--slate-100);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--slate-600);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 1rem;
+}
+.tl-item {
+  padding: 0.75rem 0 0.75rem 1.25rem;
+  border-left: 2px solid var(--slate-200);
+  margin-left: 0.5rem;
+  position: relative;
+}
+.tl-item::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 1rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--slate-300);
+}
+.tl-item.done::before { background: var(--success); }
+.tl-item.current::before { background: var(--blue-500); }
+.tl-item strong { display: block; font-size: 0.9rem; }
+.tl-item span { font-size: 0.8rem; color: var(--slate-500); }
+
+@media (max-width: 800px) {
+  .nearby-layout { grid-template-columns: 1fr; }
+}

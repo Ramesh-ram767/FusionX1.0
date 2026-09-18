@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Civic Officer Portal — Civic Resolve AI</title>
+  <link rel="stylesheet" href="css/shared.css" />
+  <link rel="stylesheet" href="css/officer.css" />
+</head>
+<body class="officer-body">
+  <nav class="dash-nav officer-nav">
+    <div class="dash-nav-inner">
+      <a href="index.html" class="brand">
+        <img src="CivicResolve Logo.png" alt="CivicResolve AI" class="brand-logo-img" />
+        Civic Resolve <span class="accent">AI</span>
+      </a>
+      <div class="nav-links">
+        <a href="#top" class="active" data-i18n="nav_dashboard">Dashboard</a>
+        <a href="#myTasks" data-i18n="nav_my_tasks">My Tasks</a>
+        <a href="#nearbyTasks" data-i18n="nav_nearby_tasks">Nearby Tasks</a>
+        <a href="#criticalTasks" data-i18n="nav_critical">Critical Tasks</a>
+        <a href="#inspections" data-i18n="nav_inspections">Inspections</a>
+        <a href="#progress" data-i18n="nav_progress">Progress Updates</a>
+        <button type="button" class="nav-link" id="openAiBtn" data-i18n="nav_ai">AI Assistant</button>
+      </div>
+      <div class="nav-actions">
+        <select id="langSelect" class="form-select" style="width:auto;padding:0.4rem 0.6rem;font-size:0.8rem;" aria-label="Language">
+          <option value="en">English</option>
+          <option value="ta">தமிழ்</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+        <div style="position:relative;">
+          <button class="icon-btn" id="notifBtn" aria-label="Notifications">🔔<span class="dot" id="notifDot"></span></button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><span data-i18n="notif_title">Notifications</span> <button class="btn btn-sm btn-ghost" id="markAllRead" data-i18n="notif_mark_all">Mark all read</button></div>
+            <div id="notifList"></div>
+          </div>
+        </div>
+        <div class="profile-chip"><span class="avatar">OF</span> <span data-i18n="role_officer">Officer Arun</span></div>
+        <a href="login.html" class="btn btn-sm btn-secondary" data-i18n="nav_logout">Logout</a>
+        <button class="nav-toggle" aria-label="Menu">☰</button>
+      </div>
+    </div>
+    <div class="mobile-menu">
+      <a href="#top" data-i18n="nav_dashboard">Dashboard</a>
+      <a href="#myTasks" data-i18n="nav_my_tasks">My Tasks</a>
+      <a href="#nearbyTasks" data-i18n="nav_nearby_tasks">Nearby Tasks</a>
+      <a href="#criticalTasks" data-i18n="nav_critical">Critical Tasks</a>
+      <a href="#inspections" data-i18n="nav_inspections">Inspections</a>
+      <a href="#progress" data-i18n="nav_progress">Progress Updates</a>
+      <button type="button" id="openAiBtnMobile" data-i18n="nav_ai">AI Assistant</button>
+      <a href="login.html" data-i18n="nav_logout">Logout</a>
+    </div>
+  </nav>
+
+  <main class="dash-main" id="top">
+    <section class="welcome officer-welcome">
+      <h1 id="welcomeTitle">Good Morning, Officer 👋</h1>
+      <p data-i18n="welcome_officer_sub">Manage your assigned civic tasks, perform field inspections and keep every issue updated.</p>
+    </section>
+
+    <section class="stats-grid" id="officerStats"></section>
+
+    <section class="section" id="myTasks">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="officer_tasks_title">Today's Priority Tasks</h2>
+          <p data-i18n="officer_tasks_sub">Your current field workload</p>
+        </div>
+      </div>
+      <div class="mock-map cr-live-map" id="officerTaskMap" style="margin-bottom:1rem;"></div>
+      <div class="map-legend" style="margin-bottom:1rem;">
+        <span class="l-p1" data-i18n="legend_critical">Critical</span>
+        <span class="l-p2" data-i18n="legend_high">High</span>
+        <span class="l-p3" data-i18n="legend_medium">Medium</span>
+        <span class="l-you" data-i18n="legend_you">You</span>
+      </div>
+      <div id="priorityTasks"></div>
+    </section>
+
+    <section class="section" id="slaAlerts">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="officer_critical_title">⚠️ Overdue &amp; SLA Alerts</h2>
+          <p data-i18n="officer_critical_sub">Act on these first</p>
+        </div>
+      </div>
+      <div class="sla-alert-grid" id="slaAlertsList"></div>
+    </section>
+
+    <section class="section" id="nearbyTasks">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="officer_nearby_title">Nearby Tasks</h2>
+          <p data-i18n="officer_nearby_sub">Tasks close to your location</p>
+        </div>
+      </div>
+      <div class="filters-row">
+        <select class="form-select" id="sortNearby">
+          <option value="distance">Sort: Distance</option>
+          <option value="priority">Sort: Priority</option>
+          <option value="due">Sort: Due time</option>
+        </select>
+        <select class="form-select" id="filterCat">
+          <option value="">Category</option>
+          <option>Road</option>
+          <option>Drainage</option>
+          <option>Streetlight</option>
+          <option>Garbage</option>
+        </select>
+        <select class="form-select" id="filterStatus">
+          <option value="">Status</option>
+          <option>Assigned</option>
+          <option>Inspected</option>
+          <option>Work In Progress</option>
+        </select>
+        <select class="form-select" id="filterPri">
+          <option value="">Priority</option>
+          <option>P1</option>
+          <option>P2</option>
+          <option>P3</option>
+        </select>
+      </div>
+      <div id="nearbyList"></div>
+    </section>
+
+    <section class="section" id="criticalTasks">
+      <div class="section-header">
+        <div>
+          <h2>Critical Tasks</h2>
+          <p>P1 and safety-critical field work</p>
+        </div>
+      </div>
+      <div id="criticalList"></div>
+    </section>
+
+    <section class="section" id="inspections">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="officer_inspect_title">Inspections</h2>
+          <p data-i18n="officer_inspect_sub">Capture evidence and notes</p>
+        </div>
+      </div>
+      <div class="card">
+        <p style="margin-bottom:1rem;color:var(--slate-600);">Open any assigned task and use <strong>Site Inspection</strong> to verify location, severity, and capture evidence. Status moves Assigned → Inspected.</p>
+        <button class="btn btn-primary btn-lg" id="startInspectionQuick">Open Top Task for Inspection</button>
+      </div>
+    </section>
+
+    <section class="section" id="progress">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="officer_progress_title">Progress Updates</h2>
+          <p data-i18n="officer_progress_sub">Keep citizens and admins informed</p>
+        </div>
+      </div>
+      <div id="progressList"></div>
+    </section>
+  </main>
+
+  <!-- Task Detail Modal -->
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 id="taskModalTitle">Task</h3>
+        <button class="modal-close" data-close-modal="taskModal">×</button>
+      </div>
+      <div class="modal-body" id="taskModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Navigate Modal -->
+  <div class="modal-overlay" id="navModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🧭 Navigate to Site</h3>
+        <button class="modal-close" data-close-modal="navModal">×</button>
+      </div>
+      <div class="modal-body" id="navModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="navModal">Close</button>
+        <button class="btn btn-primary" id="simulateNavigate">Start Navigation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inspection Modal -->
+  <div class="modal-overlay" id="inspectModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>🔍 Site Inspection</h3>
+        <button class="modal-close" data-close-modal="inspectModal">×</button>
+      </div>
+      <div class="modal-body" id="inspectBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="inspectModal">Cancel</button>
+        <button class="btn btn-primary btn-lg" id="saveInspection">Save Inspection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Completion Modal -->
+  <div class="modal-overlay" id="completeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Mark Completed</h3>
+        <button class="modal-close" data-close-modal="completeModal">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:1rem;color:var(--slate-600);">Completion evidence is required. After submit, status becomes <strong>Admin Verification</strong> — you cannot mark citizen-verified.</p>
+        <div class="form-group">
+          <label class="form-label">Completion Photo</label>
+          <input type="file" class="form-input" id="completePhoto" accept="image/*" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Completion Remarks</label>
+          <textarea class="form-textarea" id="completeRemarks" placeholder="Describe work completed..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="completeModal">Cancel</button>
+        <button class="btn btn-success" id="submitComplete">Submit for Admin Verification</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Modal -->
+  <div class="modal-overlay" id="aiModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🤖 Officer AI Assistant</h3>
+        <button class="modal-close" data-close-modal="aiModal">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="ai-guard">Field assistant only. I <strong>cannot</strong> change priority, approve completion, assign officers, or verify citizen resolution.</p>
+        <div class="ai-panel">
+          <div class="ai-messages" id="aiMessages">
+            <div class="ai-bubble bot">Ready to help with inspections, evidence checklists, and remark drafts for your assigned tasks.</div>
+          </div>
+          <div class="ai-quick" id="aiQuick">
+            <button data-q="What information do I need to collect for this task?">What to collect?</button>
+            <button data-q="Summarize the citizen reports.">Summarize reports</button>
+            <button data-q="What was the original complaint?">Original complaint</button>
+            <button data-q="What evidence is still required?">Evidence needed</button>
+            <button data-q="Draft my inspection remarks.">Draft remarks</button>
+            <button data-q="What should I update before marking this completed?">Before complete</button>
+          </div>
+          <div class="ai-input-row">
+            <input class="form-input" id="aiInput" placeholder="Ask field assistant..." />
+            <button class="btn btn-primary" id="aiSend">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/shared.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/maps.js"></script>
+  <script src="js/officer.js"></script>
+</body>
+</html>

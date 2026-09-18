@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Command Center — Civic Resolve AI</title>
+  <link rel="stylesheet" href="css/shared.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body class="admin-body">
+  <nav class="dash-nav">
+    <div class="dash-nav-inner">
+      <a href="index.html" class="brand">
+        <img src="CivicResolve Logo.png" alt="CivicResolve AI" class="brand-logo-img" />
+        Civic Resolve <span class="accent">AI</span>
+      </a>
+      <div class="nav-links">
+        <a href="#top" class="active" data-i18n="nav_dashboard">Dashboard</a>
+        <a href="#issues" data-i18n="nav_issues">Issues</a>
+        <a href="#priority" data-i18n="nav_priority">AI Priority Queue</a>
+        <a href="#clusters" data-i18n="nav_clusters">Duplicate Clusters</a>
+        <a href="#map" data-i18n="nav_map">Civic Map</a>
+        <a href="#assignments" data-i18n="nav_assignments">Assignments</a>
+        <a href="#sla" data-i18n="nav_sla">SLA Management</a>
+        <a href="#analytics" data-i18n="nav_analytics">Analytics</a>
+        <button type="button" class="nav-link" id="openAiBtn" data-i18n="nav_ai">AI Assistant</button>
+      </div>
+      <div class="nav-actions">
+        <select id="langSelect" class="form-select" style="width:auto;padding:0.4rem 0.6rem;font-size:0.8rem;" aria-label="Language">
+          <option value="en">English</option>
+          <option value="ta">தமிழ்</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+        <div style="position:relative;">
+          <button class="icon-btn" id="notifBtn" aria-label="Notifications">🔔<span class="dot" id="notifDot"></span></button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="dropdown-header"><span data-i18n="notif_title">Notifications</span> <button class="btn btn-sm btn-ghost" id="markAllRead" data-i18n="notif_mark_all">Mark all read</button></div>
+            <div id="notifList"></div>
+          </div>
+        </div>
+        <div class="profile-chip"><span class="avatar">AD</span> <span data-i18n="role_admin">Admin</span></div>
+        <a href="login.html" class="btn btn-sm btn-secondary" data-i18n="nav_logout">Logout</a>
+        <button class="nav-toggle" aria-label="Menu">☰</button>
+      </div>
+    </div>
+    <div class="mobile-menu">
+      <a href="#top" data-i18n="nav_dashboard">Dashboard</a>
+      <a href="#issues" data-i18n="nav_issues">Issues</a>
+      <a href="#priority" data-i18n="nav_priority">AI Priority Queue</a>
+      <a href="#clusters" data-i18n="nav_clusters">Duplicate Clusters</a>
+      <a href="#map" data-i18n="nav_map">Civic Map</a>
+      <a href="#assignments" data-i18n="nav_assignments">Assignments</a>
+      <a href="#sla" data-i18n="nav_sla_short">SLA</a>
+      <a href="#analytics" data-i18n="nav_analytics">Analytics</a>
+      <button type="button" id="openAiBtnMobile" data-i18n="nav_ai">AI Assistant</button>
+      <a href="login.html" data-i18n="nav_logout">Logout</a>
+    </div>
+  </nav>
+
+  <main class="dash-main" id="top">
+    <section class="welcome">
+      <h1 id="welcomeTitle">Good Morning, Admin 👋</h1>
+      <p data-i18n="welcome_admin_sub">Monitor, prioritize and coordinate civic issues across your jurisdiction.</p>
+    </section>
+
+    <section class="stats-grid kpi-grid" id="kpiGrid"></section>
+
+    <section class="section" id="priority">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_priority_title">🤖 AI Priority Queue</h2>
+          <p data-i18n="admin_priority_sub">Highest impact issues ranked by AI</p>
+        </div>
+      </div>
+      <div class="priority-grid" id="priorityQueue"></div>
+    </section>
+
+    <section class="section" id="clusters">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_clusters_title">Duplicate &amp; Issue Clusters</h2>
+          <p data-i18n="admin_clusters_sub">Merge related reports into one work item</p>
+        </div>
+      </div>
+      <div id="clusterList"></div>
+    </section>
+
+    <section class="section" id="map">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_map_title">Civic Map</h2>
+          <p data-i18n="admin_map_sub">Live Google Map of open issues</p>
+        </div>
+      </div>
+      <div class="filters-row" id="mapFilters">
+        <select class="form-select" id="fCategory"><option value="">Category</option><option>Road</option><option>Drainage</option><option>Streetlight</option><option>Garbage</option></select>
+        <select class="form-select" id="fPriority"><option value="">Priority</option><option>P1</option><option>P2</option><option>P3</option><option>P4</option></select>
+        <select class="form-select" id="fCriticality"><option value="">Criticality</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
+        <select class="form-select" id="fStatus"><option value="">Status</option><option>New</option><option>Assigned</option><option>In Progress</option><option>Completed</option></select>
+        <select class="form-select" id="fWard"><option value="">Ward</option><option>Ward 12</option><option>Ward 8</option><option>Ward 15</option></select>
+        <select class="form-select" id="fDistrict"><option value="">District</option><option>Central</option><option>North</option><option>South</option></select>
+        <select class="form-select" id="fDate"><option value="">Date</option><option>Today</option><option>This Week</option><option>This Month</option></select>
+        <select class="form-select" id="fDept"><option value="">Department</option><option>Roads</option><option>Sanitation</option><option>Utilities</option></select>
+      </div>
+      <div class="mock-map admin-map cr-live-map" id="civicMap"></div>
+      <div class="map-legend">
+        <span class="l-p1" data-i18n="legend_critical">Critical</span>
+        <span class="l-p2" data-i18n="legend_high">High</span>
+        <span class="l-p3" data-i18n="legend_medium">Medium</span>
+        <span class="l-p4" data-i18n="legend_low">Low</span>
+      </div>
+    </section>
+
+    <section class="section" id="assignments">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_assign_title">Smart Assignment</h2>
+          <p data-i18n="admin_assign_sub">Match officers to prioritized work</p>
+        </div>
+      </div>
+      <div id="assignmentPanel"></div>
+    </section>
+
+    <section class="section" id="sla">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_sla_title">SLA Management</h2>
+          <p data-i18n="admin_sla_sub">Track deadlines and overdue work</p>
+        </div>
+      </div>
+      <div class="sla-summary" id="slaSummary"></div>
+      <div class="sla-table-wrap" id="slaTable"></div>
+    </section>
+
+    <section class="section" id="issues">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_issues_title">Active Issues</h2>
+          <p data-i18n="admin_issues_sub">Browse and open issue details</p>
+        </div>
+      </div>
+      <div id="issuesList"></div>
+    </section>
+
+    <section class="section" id="analytics">
+      <div class="section-header">
+        <div>
+          <h2 data-i18n="admin_analytics_title">Analytics Snapshot</h2>
+          <p data-i18n="admin_analytics_sub">Resolution trends and workload</p>
+        </div>
+      </div>
+      <div class="analytics-grid">
+        <div class="card analytics-card">
+          <h4>Resolution Trend</h4>
+          <div class="bar-chart" id="barChart"></div>
+        </div>
+        <div class="card analytics-card">
+          <h4>Category Mix</h4>
+          <div class="cat-bars" id="catBars"></div>
+        </div>
+        <div class="card analytics-card">
+          <h4>Avg Resolution Time</h4>
+          <div class="big-metric">36<span>hrs</span></div>
+          <p class="meta-muted">↓ 12% vs last week</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Issue / Decision Modal -->
+  <div class="modal-overlay" id="adminIssueModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 id="adminIssueTitle">Issue</h3>
+        <button class="modal-close" data-close-modal="adminIssueModal">×</button>
+      </div>
+      <div class="modal-body" id="adminIssueBody"></div>
+      <div class="modal-footer" id="adminIssueFooter"></div>
+    </div>
+  </div>
+
+  <!-- Cluster Modal -->
+  <div class="modal-overlay" id="clusterModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 id="clusterTitle">Cluster</h3>
+        <button class="modal-close" data-close-modal="clusterModal">×</button>
+      </div>
+      <div class="modal-body" id="clusterBody"></div>
+    </div>
+  </div>
+
+  <!-- Assign Modal -->
+  <div class="modal-overlay" id="assignModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Assign Civic Officer</h3>
+        <button class="modal-close" data-close-modal="assignModal">×</button>
+      </div>
+      <div class="modal-body" id="assignBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="assignModal">Cancel</button>
+        <button class="btn btn-primary" id="confirmAssign">Confirm Assignment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLA Timeline Modal -->
+  <div class="modal-overlay" id="slaModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="slaModalTitle">SLA Timeline</h3>
+        <button class="modal-close" data-close-modal="slaModal">×</button>
+      </div>
+      <div class="modal-body" id="slaModalBody"></div>
+    </div>
+  </div>
+
+  <!-- AI Modal -->
+  <div class="modal-overlay" id="aiModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🤖 Admin AI Assistant</h3>
+        <button class="modal-close" data-close-modal="aiModal">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="ai-disclaimer">I assist with summaries and recommendations. <strong>I do not approve priorities, assign officers, or verify resolutions.</strong></p>
+        <div class="ai-panel">
+          <div class="ai-messages" id="aiMessages">
+            <div class="ai-bubble bot">Admin assistant ready. Ask about priority queues, clusters, SLA risk, or assignment suggestions.</div>
+          </div>
+          <div class="ai-quick" id="aiQuick">
+            <button data-q="Which issues need priority decisions?">Priority decisions?</button>
+            <button data-q="Summarize duplicate clusters">Duplicate clusters</button>
+            <button data-q="What is at SLA risk?">SLA risk</button>
+            <button data-q="Suggest officer for Ward 12 road issues">Assignment tip</button>
+          </div>
+          <div class="ai-input-row">
+            <input class="form-input" id="aiInput" placeholder="Ask the admin assistant..." />
+            <button class="btn btn-primary" id="aiSend">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/shared.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/maps.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

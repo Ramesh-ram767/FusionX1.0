@@ -1,125 +1,84 @@
-# FUSIONX 1.0 — Transparent AI-Assisted Civic Lifecycle Management System
+# CivicResolve AI — How to Run
 
-**FUSIONX** is a civic problem management and lifecycle resolution platform featuring multi-modal AI verification, duplicate detection, transparent priority ranking, and role-based operational workflows.
+You need **3 parts**. The Node server serves **frontend + backend API** together. The AI engine is a separate Python process.
 
----
-
-## 🏛️ Architecture Overview
-
-```
-                         FUSIONX 1.0
-        AI-BASED CIVIC PROBLEM MANAGEMENT ENGINE
-                              │
-                    ┌─────────▼─────────┐
-                    │  React / Vite UI  │
-                    │   Role-Based UI   │
-                    └─────────┬─────────┘
-                              │
-                    ┌─────────▼─────────┐
-                    │  Express Gateway  │
-                    │  (Port 3001)      │
-                    │  Role Auth & SLA  │
-                    └─────────┬─────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-    ┌───────────────────┐           ┌───────────────────┐
-    │  FastAPI Engine   │           │ In-Memory Stores  │
-    │  (Port 8000)      │           │ - Problems        │
-    │ - DINOv2 Base     │           │ - Audit Events    │
-    │ - BART Large MNLI │           │ - Work Orders     │
-    │ - CLIP ViT-B/32   │           │ - Inspections     │
-    │ - YOLOv11 Nano    │           │ - Feedback        │
-    │ - BLIP Captioning │           │ - Notifications   │
-    └───────────────────┘           └───────────────────┘
-```
+| Part | Port | Required? |
+|------|------|-----------|
+| Frontend + Backend (`backend/server.js`) | **3001** | Yes |
+| AI Engine (`ai-engine`) | **8000** | Optional (recommended) |
 
 ---
 
-## 🚀 Key Completed Phases
+## Easiest (Windows) — all three
 
-### 🔹 Phase 1: DINOv2 Image Embeddings & Similarity
-* Pre-trained `facebook/dinov2-base` extracting 768-dimensional normalized visual embeddings.
-* Pairwise cosine similarity calculation for visual incident comparison.
+1. Install **[Node.js LTS](https://nodejs.org/)** and **Python 3.10+**
+2. Double-click **`start.bat`** in the project folder  
 
-### 🔹 Phase 2: GPS Radius + DINOv2 Duplicate Detection
-* Haversine formula geospatial distance calculation (`DUPLICATE_RADIUS_METERS = 100`).
-* Dual-criteria potential duplicate detection (within $100$m radius AND DINOv2 visual similarity $\ge 0.80$).
-* Citizen endorsement flow: `"I'm Affected"`.
+That will:
+- install backend packages if needed  
+- open a **second window** for the AI engine (`:8000`)  
+- start frontend + API on **`http://localhost:3001/`**
 
-### 🔹 Phase 3: Multimodal Evidence Strength Score
-* Weighted multimodal consistency engine ($0–100$):
-  * **Category Consistency (40%)**: Cross-verifies BART zero-shot text classification with CLIP zero-shot image classification.
-  * **Caption Consistency (25%)**: Cross-verifies BLIP generated image captions against reported category semantics.
-  * **Object Evidence (20%)**: YOLOv11 foreground civic object detection.
-  * **Image Validity (15%)**: Image integrity and accessibility verification.
-
-### 🔹 Phase 4: Transparent AI-Assisted Priority Engine
-* Deterministic, explainable civic priority scoring formula ($0–100$):
-  $$\text{Priority Score} = 100 \times \left(0.30 \cdot s_{\text{sev}} + 0.20 \cdot s_{\text{evi}} + 0.20 \cdot s_{\text{com}} + 0.15 \cdot s_{\text{cri}} + 0.10 \cdot s_{\text{dur}} + 0.05 \cdot s_{\text{gro}}\right)$$
-* Queue Levels: `CRITICAL` ($80–100$), `HIGH` ($60–79$), `MEDIUM` ($40–59$), `LOW` ($20–39$), `VERY LOW` ($0–19$).
-* Admin Priority Queue endpoint: `GET /api/admin/problems/priority`.
-
-### 🔹 Phase 5: Role-Based Civic Workflow & Backend Lifecycle
-* **Three Strict Roles**: `CITIZEN`, `ADMIN`, `CIVIC_OFFICER`.
-* **State Machine**: `REPORTED` $\rightarrow$ `AI_ANALYZED` $\rightarrow$ `ADMIN_REVIEW` $\rightarrow$ `OFFICER_ASSIGNED` $\rightarrow$ `INSPECTION` $\rightarrow$ `WORK_REPORT_SUBMITTED` $\rightarrow$ `WORK_APPROVED` $\rightarrow$ `WORKER_ALLOCATED` $\rightarrow$ `WORK_STARTED` $\rightarrow$ `WORK_IN_PROGRESS` $\rightarrow$ `WORK_COMPLETED` $\rightarrow$ `OFFICER_VERIFIED` $\rightarrow$ `ADMIN_CLOSED` $\rightarrow$ `RESOLVED` $\rightarrow$ `REOPENED`.
-* **Public vs Internal Separation**: Public citizens see sanitized status without exposing internal priority scores or officer notes.
-* **Preserved Multi-Stage Evidence Chain**: Citizen evidence $\rightarrow$ Officer inspection evidence $\rightarrow$ Completion evidence $\rightarrow$ Citizen resolution feedback.
-* **Configurable Civic SLA Engine**: Priority-based deadlines (`CRITICAL`: 24h, `HIGH`: 72h, `MEDIUM`: 7d, `LOW`: 14d, `VERY LOW`: 21d).
-* **Role-Based Notifications & Immutable Audit Trail**: Tracks every lifecycle transition event.
+Keep **both** command windows open.
 
 ---
 
-## 🛠️ Project Structure
+## Manual (2 terminals) — clearest for demos
 
-```text
-civic-ai-engine/
-├── fusionx-ai/
-│   ├── ai-engine/               # FastAPI AI Microservice
-│   │   ├── api.py               # FastAPI endpoints (/ai/embed, /ai/evidence, /ai/priority)
-│   │   ├── models/              # DINOv2, BART, CLIP, YOLO, BLIP model wrappers
-│   │   ├── services/            # Similarity, Evidence, and Priority scoring services
-│   │   ├── requirements.txt     # Python dependencies
-│   │   └── test_*.py            # Automated test suites for AI services
-│   ├── backend/                 # Node.js / Express API Gateway
-│   │   ├── server.js            # Main Express server with role-based routing
-│   │   ├── src/
-│   │   │   ├── middleware/      # Role-based authentication & access control
-│   │   │   └── services/        # Store, Duplicate, Geospatial, SLA, Workflow, Notifications
-│   │   ├── package.json
-│   │   └── test_*.py / *.js     # Integration & security test suites
-│   └── demo-frontend/           # Vite / React Dashboard
-│       ├── src/
-│       ├── package.json
-│       └── vite.config.js
-├── brlit.jpg                    # Test asset: Streetlight
-├── garbbage.webp                # Test asset: Garbage / cavity
-├── garbbage_cropped.webp        # Test asset: Visual similarity crop
-├── waterleakage.webp            # Test asset: Water leakage
-├── yolo11n.pt                   # Local YOLOv11 model weights
-└── README.md
-```
-
----
-
-## 🧪 Running Automated Tests
+### Terminal 1 — Frontend + Backend
 
 ```bash
-# Phase 1 & FastAPI Endpoint Regression
-python fusionx-ai/ai-engine/test_fastapi_endpoints.py
-
-# Phase 2 Duplicate Detection (100m GPS + DINOv2)
-node fusionx-ai/backend/test_phase2_duplicate.js
-
-# Phase 3 Multimodal Evidence Strength Score
-python fusionx-ai/ai-engine/test_phase3_evidence.py
-
-# Phase 4 Transparent Priority Engine
-python fusionx-ai/ai-engine/test_phase4_priority.py
-
-# Phase 5 Role-Based Access Control Security Tests
-python fusionx-ai/backend/test_phase5_security.py
-
-# Phase 5 Complete 21-Step Civic Lifecycle End-to-End Test
-python fusionx-ai/backend/test_phase5_workflow.py
+cd path\to\Chennai
+npm run setup
+npm start
 ```
+
+Open: **http://localhost:3001/**
+
+### Terminal 2 — AI Engine
+
+```bash
+cd path\to\Chennai\ai-engine
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+First AI install can take a long time (ML packages). Later runs only need:
+
+```bash
+cd path\to\Chennai\ai-engine
+venv\Scripts\activate
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## Health checks
+
+| Check | URL |
+|-------|-----|
+| App / login | http://localhost:3001/ |
+| Backend API | http://localhost:3001/api/health |
+| AI engine | http://localhost:8000/health |
+| Node → AI bridge | http://localhost:3001/api/ai-health |
+
+If AI is offline, the app still runs with local fallbacks.
+
+---
+
+## Demo logins
+
+On http://localhost:3001/login.html choose:
+
+1. **Citizen** → report an issue  
+2. **Admin** → priority queue → assign officer `OFF-001`  
+3. **Civic Officer** → inspect / update tasks  
+
+---
+
+## Notes
+
+- Prefer **http://localhost:3001/** (not opening HTML as `file://`) so API + pages share one origin.  
+- Copy the whole `Chennai` folder to another laptop; skip re-copying `backend/node_modules` and `ai-engine/venv` — reinstall with the commands above.

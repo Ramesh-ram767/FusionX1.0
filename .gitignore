@@ -1,36 +1,12 @@
-# Virtual Environment
-venv/
-.venv/
-env/
-ENV/
-
-# Node dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build outputs
-dist/
-build/
-
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.pytest_cache/
-
-# Temporary uploads & logs
-uploads/*
-!uploads/.gitkeep
-*.log
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# OS generated files
+backend/node_modules/
+ai-engine/venv/
+ai-engine/uploads/*
+!ai-engine/uploads/.gitkeep
+**/__pycache__/
+*.pyc
 .DS_Store
-Thumbs.db
+_engine_extract/
+_backup_simple/
+backend-engine/
+*.log

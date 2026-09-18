@@ -1,4 +1,0 @@
-transformers>=4.42.0
-torch>=2.2.0
-ultralytics>=8.2.0
-pillow>=10.0.0
