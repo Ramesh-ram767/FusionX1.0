@@ -88,7 +88,7 @@ civic-ai-engine/
 │   │   │   └── services/        # Store, Duplicate, Geospatial, SLA, Workflow, Notifications
 │   │   ├── package.json
 │   │   └── test_*.py / *.js     # Integration & security test suites
-│   └── frontend/                # Vite / React Dashboard
+│   └── demo-frontend/           # Vite / React Dashboard
 │       ├── src/
 │       ├── package.json
 │       └── vite.config.js
