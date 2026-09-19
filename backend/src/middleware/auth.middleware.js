@@ -81,7 +81,23 @@ export function requireRole(...allowedRoles) {
  * Ensure a Civic Officer caller is only operating on an issue assigned to them.
  */
 export function verifyOfficerAssignment(problemGetter) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
+    const problemId = req.params.id;
+    let problem = req.problem;
+    if (!problem && typeof problemGetter === 'function') {
+      try {
+        problem = await problemGetter(problemId);
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    }
+
+    if (!problem) {
+      return res.status(404).json({ success: false, error: 'Problem not found' });
+    }
+
+    req.problem = problem;
+
     // Admins bypass officer-specific restriction
     if (req.user?.role === ROLES.ADMIN) {
       return next();
@@ -94,13 +110,6 @@ export function verifyOfficerAssignment(problemGetter) {
       });
     }
 
-    const problemId = req.params.id;
-    const problem = typeof problemGetter === 'function' ? problemGetter(problemId) : req.problem;
-
-    if (!problem) {
-      return res.status(404).json({ success: false, error: 'Problem not found' });
-    }
-
     const assignedOfficer = problem.assignment?.officer_id;
     if (!assignedOfficer || String(assignedOfficer) !== String(req.user.id)) {
       return res.status(403).json({
@@ -109,7 +118,6 @@ export function verifyOfficerAssignment(problemGetter) {
       });
     }
 
-    req.problem = problem;
     next();
   };
 }

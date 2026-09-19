@@ -134,7 +134,7 @@ export function isValidTransition(fromStatus, toStatus) {
 /**
  * Execute a validated workflow transition and log an immutable audit event.
  */
-export function transitionProblemStatus(problem, targetStatus, actor = {}, remarks = '', metadata = {}, store = null) {
+export async function transitionProblemStatus(problem, targetStatus, actor = {}, remarks = '', metadata = {}, store = null) {
   const currentInternal = problem.internal_status || INTERNAL_STATUS.REPORTED;
 
   if (!isValidTransition(currentInternal, targetStatus)) {
@@ -163,7 +163,10 @@ export function transitionProblemStatus(problem, targetStatus, actor = {}, remar
   };
 
   if (store && typeof store.addAuditEvent === 'function') {
-    store.addAuditEvent(auditEvent);
+    await store.addAuditEvent(auditEvent);
+  }
+  if (store && typeof store.updateProblemStatus === 'function') {
+    await store.updateProblemStatus(problem.id, targetStatus, problem.status);
   }
 
   return auditEvent;

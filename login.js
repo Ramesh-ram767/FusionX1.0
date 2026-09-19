@@ -61,6 +61,14 @@
   var lpPasswordInput = document.getElementById('lpPassword');
   var lpToast         = document.getElementById('lpToast');
   var lpFormContext    = document.getElementById('lpFormContext');
+  var lpNameGroup     = document.getElementById('lpNameGroup');
+  var lpNameInput     = document.getElementById('lpName');
+  var lpToggleMode    = document.getElementById('lpToggleMode');
+  var lpToggleLink    = document.getElementById('lpToggleLink');
+  var lpTogglePrompt  = document.getElementById('lpTogglePrompt');
+  var lpSubmitText    = document.getElementById('lpSubmitText');
+  var lpRememberRow   = document.getElementById('lpRememberRow');
+  var isSignupMode    = false;
 
   var roleCards = lpRolesEl
     ? Array.from(lpRolesEl.querySelectorAll('.lp-role-card'))
@@ -132,6 +140,13 @@
     if (lpSubmit) {
       lpSubmit.style.boxShadow =
         '0 4px 22px ' + meta.shadow + ',0 1px 0 rgba(255,255,255,0.15) inset';
+    }
+
+    if (role !== 'citizen') {
+      setMode(false);
+      if (lpToggleMode) lpToggleMode.style.display = 'none';
+    } else {
+      if (lpToggleMode) lpToggleMode.style.display = 'block';
     }
 
     showForm();
@@ -234,10 +249,14 @@
         return;
       }
 
-      /* Require non-empty fields (no credential validation) */
       var emailVal = lpEmailInput    ? lpEmailInput.value.trim()    : '';
       var passVal  = lpPasswordInput ? lpPasswordInput.value        : '';
+      var nameVal  = lpNameInput     ? lpNameInput.value.trim()     : '';
 
+      if (isSignupMode && !nameVal) {
+        markEmpty(lpNameInput, 'Please enter your full name.');
+        return;
+      }
       if (!emailVal) {
         markEmpty(lpEmailInput, 'Please enter your email or username.');
         return;
@@ -247,9 +266,7 @@
         return;
       }
 
-      /* ✅ Accept — show loading then redirect (prefer backend auth) */
       setLoading(true);
-      showToast('✅ Signing you in as ' + ROLES[selectedRole].label + '…', 2800);
 
       function finishLogin() {
         setTimeout(function () {
@@ -257,26 +274,73 @@
         }, 600);
       }
 
+      if (isSignupMode) {
+        showToast('⏳ Creating your citizen account…', 2500);
+        if (window.CivicAPI && CivicAPI.signup) {
+          CivicAPI.signup(nameVal, emailVal, passVal, 'CITIZEN')
+            .then(function (data) {
+              showToast('✅ Account created! Welcome, ' + ((data && data.user && data.user.name) || nameVal) + '!', 2500);
+              if (window.CivicAPI) {
+                CivicAPI.setSession('citizen', emailVal, data && data.user);
+              }
+              finishLogin();
+            })
+            .catch(function (err) {
+              setLoading(false);
+              showToast('❌ ' + (err.message || 'Registration failed.'), 3500);
+            });
+        } else {
+          showToast('❌ API client not ready.', 3000);
+          setLoading(false);
+        }
+        return;
+      }
+
+      /* Login Mode */
+      showToast('✅ Signing you in as ' + ROLES[selectedRole].label + '…', 2500);
+
       if (window.CivicAPI && CivicAPI.login) {
         CivicAPI.login(selectedRole, emailVal, passVal)
           .then(function (data) {
             if (data && data.user) {
-              CivicAPI.setSession(selectedRole, data.user.email || emailVal);
+              CivicAPI.setSession(selectedRole, data.user.email || emailVal, data.user);
             } else {
               CivicAPI.setSession(selectedRole, emailVal);
             }
             finishLogin();
           })
-          .catch(function () {
-            /* Backend offline — still allow demo login locally */
-            if (window.CivicAPI) CivicAPI.setSession(selectedRole, emailVal);
-            showToast('⚠️ Backend offline — continuing with local demo session', 2500);
-            finishLogin();
+          .catch(function (err) {
+            setLoading(false);
+            showToast('❌ ' + (err.message || 'Login failed: check your credentials.'), 3500);
           });
       } else {
         finishLogin();
       }
     });
+
+    function setMode(signup) {
+      isSignupMode = Boolean(signup);
+      if (lpNameGroup) lpNameGroup.style.display = isSignupMode ? 'block' : 'none';
+      if (lpRememberRow) lpRememberRow.style.display = isSignupMode ? 'none' : 'flex';
+      if (lpSubmitText) {
+        lpSubmitText.innerHTML = isSignupMode
+          ? '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M15 9H3M10 4l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Create Citizen Account'
+          : '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M15 9H3M10 4l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Login to CivicResolve AI';
+      }
+      if (lpTogglePrompt) {
+        lpTogglePrompt.textContent = isSignupMode ? 'Already have an account?' : "Don't have a citizen account?";
+      }
+      if (lpToggleLink) {
+        lpToggleLink.textContent = isSignupMode ? 'Sign In' : 'Sign Up';
+      }
+    }
+
+    if (lpToggleLink) {
+      lpToggleLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        setMode(!isSignupMode);
+      });
+    }
   }
 
   function markEmpty(input, msg) {

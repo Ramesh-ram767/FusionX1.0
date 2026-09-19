@@ -1,17 +1,11 @@
-/**
- * FUSIONX Civic In-Memory Notification Service
- * Dispatches and tracks role-based notifications without external providers.
- */
+import { store } from './store.service.js';
+import { pool } from '../config/database.js';
 
 class NotificationService {
-  constructor() {
-    this.notifications = [];
-  }
-
   /**
-   * Dispatch a new notification.
+   * Dispatch a new persistent notification in MySQL.
    */
-  notify({
+  async notify({
     recipient_role,
     recipient_id = null,
     title,
@@ -20,55 +14,33 @@ class NotificationService {
     problem_id = null,
     metadata = {},
   }) {
-    const notification = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      recipient_role: recipient_role ? String(recipient_role).toUpperCase() : null,
-      recipient_id: recipient_id ? String(recipient_id) : null,
-      title: title || 'Civic Update',
-      message: message || '',
-      type, // INFO, WARNING, ALERT, SUCCESS
-      problem_id: problem_id ? String(problem_id) : null,
+    return store.createNotification({
+      recipient_role,
+      recipient_id,
+      title,
+      message,
+      type,
+      problem_id,
       metadata,
-      read: false,
-      created_at: new Date().toISOString(),
-    };
-
-    this.notifications.unshift(notification);
-    return notification;
-  }
-
-  /**
-   * Retrieve notifications matching role and/or specific user ID.
-   */
-  getForUser({ role, user_id, unread_only = false }) {
-    return this.notifications.filter((n) => {
-      // 1. Role match check
-      const roleMatch = !n.recipient_role || n.recipient_role === role;
-
-      // 2. Recipient ID check (if targeted to a specific individual)
-      const idMatch = !n.recipient_id || n.recipient_id === user_id;
-
-      // 3. Unread check
-      const unreadMatch = !unread_only || !n.read;
-
-      return roleMatch && idMatch && unreadMatch;
     });
   }
 
   /**
-   * Mark a notification as read.
+   * Retrieve notifications matching role and/or specific user ID from MySQL.
    */
-  markRead(notificationId) {
-    const notif = this.notifications.find((n) => String(n.id) === String(notificationId));
-    if (notif) {
-      notif.read = true;
-      return notif;
-    }
-    return null;
+  async getForUser({ role, user_id, unread_only = false }) {
+    return store.getNotifications({ role, user_id, unread_only });
   }
 
-  reset() {
-    this.notifications = [];
+  /**
+   * Mark a notification as read in MySQL.
+   */
+  async markRead(notificationId) {
+    return store.markNotificationRead(notificationId);
+  }
+
+  async reset() {
+    await pool.query('DELETE FROM notifications;');
   }
 }
 

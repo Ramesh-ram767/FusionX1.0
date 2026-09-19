@@ -24,15 +24,17 @@
     }
   }
 
-  function setSession(roleKey, email) {
-    const meta = ROLE_MAP[roleKey] || ROLE_MAP.citizen;
+  function setSession(roleKey, email, userObj) {
+    const meta = Object.assign({}, ROLE_MAP[roleKey] || ROLE_MAP.citizen);
+    if (userObj && userObj.id) meta.id = userObj.id;
+    if (userObj && userObj.role) meta.role = userObj.role;
     try {
       localStorage.setItem('cr_role', roleKey);
       localStorage.setItem('civicRole', roleKey);
       localStorage.setItem('cr_api_role', meta.role);
       localStorage.setItem('cr_user_id', meta.id);
       localStorage.setItem('civicUser', email || meta.id + '@civicresolve.ai');
-      localStorage.setItem('cr_user', email || meta.id);
+      localStorage.setItem('cr_user', (userObj && userObj.name) || email || meta.id);
     } catch (_) {}
     return meta;
   }
@@ -117,6 +119,12 @@
       request('/api/auth/login', {
         method: 'POST',
         body: { role: roleKey, email, password },
+      }),
+
+    signup: (name, email, password, role = 'CITIZEN') =>
+      request('/api/auth/signup', {
+        method: 'POST',
+        body: { name, email, password, role },
       }),
 
     me: () => request('/api/auth/me'),

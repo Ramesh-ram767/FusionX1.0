@@ -37,6 +37,8 @@ import {
 } from './src/services/workflow.service.js';
 import { calculateProblemSla, getSlaSummary } from './src/services/sla.service.js';
 import { notificationService } from './src/services/notification.service.js';
+import { testConnection } from './src/config/database.js';
+import { signupUser, loginUser } from './src/services/auth.service.js';
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -67,6 +69,7 @@ const apiGatewayInfo = {
   roles: [ROLES.CITIZEN, ROLES.ADMIN, ROLES.CIVIC_OFFICER],
   endpoints: {
     health: 'GET /api/health',
+    db_health: 'GET /api/db-health',
     ai_health: 'GET /api/ai-health',
     citizen: {
       list_problems: 'GET /api/problems (Citizen Safe)',
@@ -126,7 +129,22 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-/* ---------- Auth (demo header-based roles) ---------- */
+app.get('/api/db-health', async (_req, res) => {
+  const dbHealth = await testConnection();
+  if (dbHealth.success) {
+    return res.json({
+      status: 'ok',
+      database: 'connected',
+    });
+  }
+  return res.status(503).json({
+    status: 'error',
+    database: 'disconnected',
+    message: 'Database connection failed',
+  });
+});
+
+/* ---------- Auth (Persistent MySQL Authentication & Demo Fallbacks) ---------- */
 const DEMO_USERS = {
   citizen: { role: ROLES.CITIZEN, id: 'citizen-101', name: 'Citizen Demo', dashboard: '/citizen-dashboard.html' },
   admin: { role: ROLES.ADMIN, id: 'admin-1', name: 'Admin Demo', dashboard: '/admin-dashboard.html' },
@@ -136,40 +154,66 @@ const DEMO_USERS = {
   CIVIC_OFFICER: { role: ROLES.CIVIC_OFFICER, id: 'OFF-001', name: 'Officer Arun', dashboard: '/officer-dashboard.html' },
 };
 
-app.post('/api/auth/login', (req, res) => {
-  const { role, email, password } = req.body || {};
-  const key = String(role || '').trim();
-  const user = DEMO_USERS[key] || DEMO_USERS[key.toLowerCase()];
-  if (!user) {
-    return res.status(400).json({
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body || {};
+    const user = await signupUser({ name, email, password, role });
+    const token = `${user.role}:${user.id}`;
+    return res.status(201).json({
+      success: true,
+      message: `User ${user.name} registered successfully.`,
+      user: {
+        id: user.id,
+        role: user.role,
+        name: user.name,
+        email: user.email,
+        dashboard: user.dashboard,
+      },
+      token,
+      headers: {
+        'x-user-role': user.role,
+        'x-user-id': user.id,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (err) {
+    const statusCode = err.statusCode || (err.code === 'ER_DUP_ENTRY' ? 409 : 500);
+    return res.status(statusCode).json({
       success: false,
-      error: 'Invalid role. Use citizen, admin, or officer.',
+      error: err.message || 'Error occurred during registration.',
     });
   }
-  if (!email || !password) {
-    return res.status(400).json({
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password, role } = req.body || {};
+    const user = await loginUser({ email, password, role });
+    const token = `${user.role}:${user.id}`;
+    return res.json({
+      success: true,
+      message: `Signed in as ${user.name}`,
+      user: {
+        id: user.id,
+        role: user.role,
+        name: user.name,
+        email: user.email,
+        dashboard: user.dashboard,
+      },
+      token,
+      headers: {
+        'x-user-role': user.role,
+        'x-user-id': user.id,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    return res.status(statusCode).json({
       success: false,
-      error: 'Email and password are required (any non-empty values accepted in demo).',
+      error: err.message || 'Authentication failed.',
     });
   }
-  const token = `${user.role}:${user.id}`;
-  res.json({
-    success: true,
-    message: `Signed in as ${user.name}`,
-    user: {
-      id: user.id,
-      role: user.role,
-      name: user.name,
-      email: String(email).trim(),
-      dashboard: user.dashboard,
-    },
-    token,
-    headers: {
-      'x-user-role': user.role,
-      'x-user-id': user.id,
-      Authorization: `Bearer ${token}`,
-    },
-  });
 });
 
 app.get('/api/auth/me', (req, res) => {
@@ -224,14 +268,15 @@ app.get('/api/ai-health', async (_req, res) => {
 // ==========================================
 
 // List problems (Citizen safe view: strictly no internal admin signals)
-app.get('/api/problems', (_req, res) => {
-  const problems = store.getAll().map(sanitizeForCitizen);
+app.get('/api/problems', async (_req, res) => {
+  const allProblems = await store.getAll();
+  const problems = allProblems.map(sanitizeForCitizen);
   res.json({ success: true, count: problems.length, problems });
 });
 
 // Get single problem by ID (sanitized for citizens; full view for Admin / assigned Officer)
-app.get('/api/problems/:id', (req, res) => {
-  const problem = store.getById(req.params.id);
+app.get('/api/problems/:id', async (req, res) => {
+  const problem = await store.getById(req.params.id);
   if (!problem) {
     return res.status(404).json({ success: false, error: 'Problem not found' });
   }
@@ -349,7 +394,7 @@ app.post('/api/problems', upload.single('image'), async (req, res) => {
     }
 
     // 4. Create problem in store
-    const created = store.create({
+    const created = await store.create({
       title,
       description,
       category,
@@ -365,7 +410,7 @@ app.post('/api/problems', upload.single('image'), async (req, res) => {
     });
 
     // 5. Record immutable audit events (REPORTED -> AI_ANALYZED -> ADMIN_REVIEW)
-    store.addAuditEvent({
+    await store.addAuditEvent({
       id: `evt-${Date.now()}-1`,
       problem_id: String(created.id),
       from_status: INTERNAL_STATUS.REPORTED,
@@ -377,7 +422,7 @@ app.post('/api/problems', upload.single('image'), async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
-    store.addAuditEvent({
+    await store.addAuditEvent({
       id: `evt-${Date.now()}-2`,
       problem_id: String(created.id),
       from_status: INTERNAL_STATUS.AI_ANALYZED,
@@ -390,7 +435,7 @@ app.post('/api/problems', upload.single('image'), async (req, res) => {
     });
 
     // 6. Notify Citizen
-    notificationService.notify({
+    await notificationService.notify({
       recipient_role: ROLES.CITIZEN,
       recipient_id: created.created_by,
       title: 'Problem Reported',
@@ -401,7 +446,7 @@ app.post('/api/problems', upload.single('image'), async (req, res) => {
 
     // 7. Notify Admin if critical
     if (priorityAnalysis?.priority_level === 'CRITICAL') {
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.ADMIN,
         title: 'Critical Problem Reported',
         message: `High priority problem #${created.id} reported in ${created.category}. Immediate triage recommended.`,
@@ -428,7 +473,7 @@ app.post('/api/problems/:id/support', upload.single('image'), async (req, res) =
     const userId = req.user?.id || req.body?.user_id || 'anonymous_user';
     const uploadedImage = req.file ? req.file.path : null;
 
-    const result = store.addSupport(problemId, {
+    const result = await store.addSupport(problemId, {
       user_id: userId,
       explanation,
       latitude,
@@ -448,11 +493,12 @@ app.post('/api/problems/:id/support', upload.single('image'), async (req, res) =
         severity: result.problem.inspection?.severity ?? result.problem.severity ?? null,
       });
       result.problem.priority_analysis = updatedPriority;
+      await store.saveAIAnalysis(problemId, updatedPriority);
     } catch (priorityErr) {
       console.warn('[Priority] Recalculation on support failed:', priorityErr.message);
     }
 
-    store.addAuditEvent({
+    await store.addAuditEvent({
       id: `evt-${Date.now()}-sup`,
       problem_id: String(problemId),
       from_status: result.problem.internal_status,
@@ -477,10 +523,10 @@ app.post('/api/problems/:id/support', upload.single('image'), async (req, res) =
 });
 
 // Citizen: view own reported problems
-app.get('/api/citizen/my-reports', requireRole(ROLES.CITIZEN), (req, res) => {
+app.get('/api/citizen/my-reports', requireRole(ROLES.CITIZEN), async (req, res) => {
   const citizenId = req.user.id;
-  const myReports = store
-    .getAll()
+  const allProblems = await store.getAll();
+  const myReports = allProblems
     .filter((p) => String(p.created_by) === String(citizenId))
     .map(sanitizeForCitizen);
 
@@ -488,10 +534,10 @@ app.get('/api/citizen/my-reports', requireRole(ROLES.CITIZEN), (req, res) => {
 });
 
 // Citizen: view problems they supported
-app.get('/api/citizen/my-supports', requireRole(ROLES.CITIZEN), (req, res) => {
+app.get('/api/citizen/my-supports', requireRole(ROLES.CITIZEN), async (req, res) => {
   const citizenId = req.user.id;
-  const mySupports = store
-    .getAll()
+  const allProblems = await store.getAll();
+  const mySupports = allProblems
     .filter((p) => Array.isArray(p.supports) && p.supports.some((s) => String(s.user_id) === String(citizenId)))
     .map(sanitizeForCitizen);
 
@@ -499,9 +545,9 @@ app.get('/api/citizen/my-supports', requireRole(ROLES.CITIZEN), (req, res) => {
 });
 
 // Citizen: Resolution feedback ("Issue resolved" vs "Still not resolved")
-app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), upload.single('photo'), (req, res) => {
+app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), upload.single('photo'), async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -510,7 +556,7 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
     const isResolved = resolved === true || resolved === 'true';
     const photo = req.file ? req.file.path : req.body?.photo || null;
 
-    const feedbackRecord = store.addResolutionFeedback(problem.id, {
+    const feedbackRecord = await store.addResolutionFeedback(problem.id, {
       resolved: isResolved,
       comment: comment || '',
       photo,
@@ -518,7 +564,7 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
     });
 
     if (isResolved) {
-      store.addAuditEvent({
+      await store.addAuditEvent({
         id: `evt-${Date.now()}-res-ok`,
         problem_id: String(problem.id),
         from_status: problem.internal_status,
@@ -530,7 +576,7 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
         timestamp: new Date().toISOString(),
       });
 
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.CITIZEN,
         recipient_id: req.user.id,
         title: 'Resolution Confirmed',
@@ -547,7 +593,7 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
       });
     } else {
       // Citizen says "Still not resolved" -> transition to REOPENED -> ADMIN_REVIEW
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.REOPENED,
         req.user,
@@ -556,7 +602,7 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
         store
       );
 
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.ADMIN_REVIEW,
         { id: 'system', role: 'SYSTEM' },
@@ -565,7 +611,7 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
         store
       );
 
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.ADMIN,
         title: 'Problem Reopened by Citizen',
         message: `Problem #${problem.id} was reopened by citizen: "${comment || 'Unresolved'}". Re-verification required.`,
@@ -591,10 +637,10 @@ app.post('/api/problems/:id/resolution-feedback', requireRole(ROLES.CITIZEN), up
 // ==========================================
 
 // Admin Command Center Dashboard metrics
-app.get('/api/admin/dashboard', requireRole(ROLES.ADMIN), (_req, res) => {
+app.get('/api/admin/dashboard', requireRole(ROLES.ADMIN), async (_req, res) => {
   try {
-    const allProblems = store.getAll();
-    const openProblems = store.getOpen();
+    const allProblems = await store.getAll();
+    const openProblems = await store.getOpen();
 
     let criticalCount = 0;
     let newReportsCount = 0;
@@ -651,7 +697,7 @@ app.get('/api/admin/dashboard', requireRole(ROLES.ADMIN), (_req, res) => {
 // Admin Priority Queue (Phase 4 Priority Engine output sorted descending)
 app.get('/api/admin/problems/priority', requireRole(ROLES.ADMIN), async (_req, res) => {
   try {
-    const openProblems = store.getOpen();
+    const openProblems = await store.getOpen();
 
     const queuePromises = openProblems.map(async (problem) => {
       let priority = problem.priority_analysis;
@@ -715,9 +761,9 @@ app.get('/api/admin/problems/priority', requireRole(ROLES.ADMIN), async (_req, r
 });
 
 // Admin: Assign Civic Officer to problem
-app.post('/api/admin/problems/:id/assign', requireRole(ROLES.ADMIN), (req, res) => {
+app.post('/api/admin/problems/:id/assign', requireRole(ROLES.ADMIN), async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -734,8 +780,9 @@ app.post('/api/admin/problems/:id/assign', requireRole(ROLES.ADMIN), (req, res) 
       assignment_status: 'ASSIGNED',
       remarks: remarks || '',
     };
+    await store.assignOfficer(problem.id, problem.assignment);
 
-    transitionProblemStatus(
+    await transitionProblemStatus(
       problem,
       INTERNAL_STATUS.OFFICER_ASSIGNED,
       req.user,
@@ -745,7 +792,7 @@ app.post('/api/admin/problems/:id/assign', requireRole(ROLES.ADMIN), (req, res) 
     );
 
     // Notify assigned officer
-    notificationService.notify({
+    await notificationService.notify({
       recipient_role: ROLES.CIVIC_OFFICER,
       recipient_id: officer_id,
       title: 'New Task Assignment',
@@ -755,7 +802,7 @@ app.post('/api/admin/problems/:id/assign', requireRole(ROLES.ADMIN), (req, res) 
     });
 
     // Notify citizen
-    notificationService.notify({
+    await notificationService.notify({
       recipient_role: ROLES.CITIZEN,
       recipient_id: problem.created_by,
       title: 'Officer Assigned',
@@ -776,9 +823,9 @@ app.post('/api/admin/problems/:id/assign', requireRole(ROLES.ADMIN), (req, res) 
 });
 
 // Admin: Review & Approve/Reject Officer Work Report
-app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), (req, res) => {
+app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -787,7 +834,7 @@ app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), (req,
     const isApproved = approved === true || approved === 'true';
 
     if (isApproved) {
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.WORK_APPROVED,
         req.user,
@@ -797,7 +844,7 @@ app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), (req,
       );
 
       if (problem.assignment?.officer_id) {
-        notificationService.notify({
+        await notificationService.notify({
           recipient_role: ROLES.CIVIC_OFFICER,
           recipient_id: problem.assignment.officer_id,
           title: 'Work Plan Approved',
@@ -809,7 +856,7 @@ app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), (req,
 
       res.json({ success: true, message: 'Work plan approved.', problem });
     } else {
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.WORK_REVIEW_REQUIRED,
         req.user,
@@ -819,7 +866,7 @@ app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), (req,
       );
 
       if (problem.assignment?.officer_id) {
-        notificationService.notify({
+        await notificationService.notify({
           recipient_role: ROLES.CIVIC_OFFICER,
           recipient_id: problem.assignment.officer_id,
           title: 'Work Plan Needs Revision',
@@ -838,9 +885,9 @@ app.post('/api/admin/problems/:id/approve-work', requireRole(ROLES.ADMIN), (req,
 });
 
 // Admin: Allocate workers and resources (Work Order)
-app.post('/api/admin/problems/:id/work-order', requireRole(ROLES.ADMIN), (req, res) => {
+app.post('/api/admin/problems/:id/work-order', requireRole(ROLES.ADMIN), async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -862,8 +909,9 @@ app.post('/api/admin/problems/:id/work-order', requireRole(ROLES.ADMIN), (req, r
       allocated_at: new Date().toISOString(),
       allocated_by: req.user.id,
     };
+    await store.saveWorkOrder(problem.id, problem.work_order);
 
-    transitionProblemStatus(
+    await transitionProblemStatus(
       problem,
       INTERNAL_STATUS.WORKER_ALLOCATED,
       req.user,
@@ -874,7 +922,7 @@ app.post('/api/admin/problems/:id/work-order', requireRole(ROLES.ADMIN), (req, r
 
     // Notify officer
     if (problem.assignment?.officer_id) {
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.CIVIC_OFFICER,
         recipient_id: problem.assignment.officer_id,
         title: 'Workers Allocated',
@@ -897,9 +945,9 @@ app.post('/api/admin/problems/:id/work-order', requireRole(ROLES.ADMIN), (req, r
 });
 
 // Admin: Progress work execution status
-app.post('/api/admin/problems/:id/work-status', requireRole(ROLES.ADMIN), (req, res) => {
+app.post('/api/admin/problems/:id/work-status', requireRole(ROLES.ADMIN), async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -918,7 +966,7 @@ app.post('/api/admin/problems/:id/work-status', requireRole(ROLES.ADMIN), (req, 
       });
     }
 
-    transitionProblemStatus(
+    await transitionProblemStatus(
       problem,
       status,
       req.user,
@@ -929,7 +977,7 @@ app.post('/api/admin/problems/:id/work-status', requireRole(ROLES.ADMIN), (req, 
 
     // If completed, alert officer to perform completion verification
     if (status === INTERNAL_STATUS.WORK_COMPLETED && problem.assignment?.officer_id) {
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.CIVIC_OFFICER,
         recipient_id: problem.assignment.officer_id,
         title: 'Completion Verification Required',
@@ -951,9 +999,9 @@ app.post('/api/admin/problems/:id/work-status', requireRole(ROLES.ADMIN), (req, 
 });
 
 // Admin: Final review and closure
-app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), (req, res) => {
+app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -962,7 +1010,7 @@ app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), (req, res) =
     const isApproved = approved !== false && approved !== 'false';
 
     if (!isApproved) {
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.ADMIN_REVIEW,
         req.user,
@@ -979,7 +1027,7 @@ app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), (req, res) =
     }
 
     // Transition to ADMIN_CLOSED then RESOLVED
-    transitionProblemStatus(
+    await transitionProblemStatus(
       problem,
       INTERNAL_STATUS.ADMIN_CLOSED,
       req.user,
@@ -988,7 +1036,7 @@ app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), (req, res) =
       store
     );
 
-    transitionProblemStatus(
+    await transitionProblemStatus(
       problem,
       INTERNAL_STATUS.RESOLVED,
       { id: 'system', role: 'SYSTEM' },
@@ -998,7 +1046,7 @@ app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), (req, res) =
     );
 
     // Notify citizen creator
-    notificationService.notify({
+    await notificationService.notify({
       recipient_role: ROLES.CITIZEN,
       recipient_id: problem.created_by,
       title: 'Problem Resolved',
@@ -1019,9 +1067,9 @@ app.post('/api/admin/problems/:id/close', requireRole(ROLES.ADMIN), (req, res) =
 });
 
 // Admin: SLA Overview
-app.get('/api/admin/sla', requireRole(ROLES.ADMIN), (_req, res) => {
+app.get('/api/admin/sla', requireRole(ROLES.ADMIN), async (_req, res) => {
   try {
-    const allProblems = store.getAll();
+    const allProblems = await store.getAll();
     const slaSummary = getSlaSummary(allProblems);
     res.json({ success: true, ...slaSummary });
   } catch (error) {
@@ -1030,8 +1078,8 @@ app.get('/api/admin/sla', requireRole(ROLES.ADMIN), (_req, res) => {
 });
 
 // Admin: Audit Event Trail for a problem
-app.get('/api/admin/problems/:id/audit', requireRole(ROLES.ADMIN), (req, res) => {
-  const events = store.getAuditEvents(req.params.id);
+app.get('/api/admin/problems/:id/audit', requireRole(ROLES.ADMIN), async (req, res) => {
+  const events = await store.getAuditEvents(req.params.id);
   res.json({ success: true, problem_id: req.params.id, count: events.length, events });
 });
 
@@ -1040,10 +1088,11 @@ app.get('/api/admin/problems/:id/audit', requireRole(ROLES.ADMIN), (req, res) =>
 // ==========================================
 
 // Civic Officer: Dashboard task queue (strictly assigned to caller)
-app.get('/api/officer/problems', requireRole(ROLES.CIVIC_OFFICER), (req, res) => {
+app.get('/api/officer/problems', requireRole(ROLES.CIVIC_OFFICER), async (req, res) => {
   try {
     const officerId = String(req.user.id);
-    const assignedProblems = store.getAll().filter((p) => {
+    const allProblems = await store.getAll();
+    const assignedProblems = allProblems.filter((p) => {
       const assigned = p.assignment?.officer_id;
       return assigned && String(assigned) === officerId;
     });
@@ -1175,10 +1224,15 @@ app.post(
         console.warn('[Priority] Officer inspection recalculation failed:', pErr.message);
       }
 
+      await store.saveInspection(problem.id, problem.inspection);
+      if (problem.priority_analysis) {
+        await store.saveAIAnalysis(problem.id, problem.priority_analysis);
+      }
+
       // 3. Status transition
       if (!exists) {
         problem.field_verification_flag = 'ISSUE_NOT_FOUND';
-        transitionProblemStatus(
+        await transitionProblemStatus(
           problem,
           INTERNAL_STATUS.ADMIN_REVIEW,
           req.user,
@@ -1187,7 +1241,7 @@ app.post(
           store
         );
 
-        notificationService.notify({
+        await notificationService.notify({
           recipient_role: ROLES.ADMIN,
           title: 'Problem Not Found on Site',
           message: `Officer ${req.user.id} reported problem #${problem.id} not found during inspection. Admin review required.`,
@@ -1203,7 +1257,7 @@ app.post(
         });
       }
 
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.INSPECTION,
         req.user,
@@ -1212,7 +1266,7 @@ app.post(
         store
       );
 
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.ADMIN,
         title: 'Inspection Completed',
         message: `Officer ${req.user.id} completed field inspection for problem #${problem.id} (Verified severity: ${verifiedSeverity}/5).`,
@@ -1239,7 +1293,7 @@ app.post(
   '/api/officer/problems/:id/work-report',
   requireRole(ROLES.CIVIC_OFFICER),
   verifyOfficerAssignment((id) => store.getById(id)),
-  (req, res) => {
+  async (req, res) => {
     try {
       const problem = req.problem;
       const {
@@ -1261,8 +1315,9 @@ app.post(
         submitted_at: new Date().toISOString(),
         submitted_by: req.user.id,
       };
+      await store.saveWorkReport(problem.id, problem.work_report);
 
-      transitionProblemStatus(
+      await transitionProblemStatus(
         problem,
         INTERNAL_STATUS.WORK_REPORT_SUBMITTED,
         req.user,
@@ -1271,7 +1326,7 @@ app.post(
         store
       );
 
-      notificationService.notify({
+      await notificationService.notify({
         recipient_role: ROLES.ADMIN,
         title: 'Work Estimation Submitted',
         message: `Officer ${req.user.id} submitted work estimate for problem #${problem.id}. Ready for approval.`,
@@ -1297,7 +1352,7 @@ app.post(
   '/api/officer/problems/:id/completion-verification',
   requireRole(ROLES.CIVIC_OFFICER),
   verifyOfficerAssignment((id) => store.getById(id)),
-  (req, res) => {
+  async (req, res) => {
     try {
       const problem = req.problem;
       const { completed, remarks, photos, videos } = req.body || {};
@@ -1311,9 +1366,10 @@ app.post(
         verified_at: new Date().toISOString(),
         verified_by: req.user.id,
       };
+      await store.saveCompletion(problem.id, problem.completion_verification);
 
       if (isComplete) {
-        transitionProblemStatus(
+        await transitionProblemStatus(
           problem,
           INTERNAL_STATUS.OFFICER_VERIFIED,
           req.user,
@@ -1322,7 +1378,7 @@ app.post(
           store
         );
 
-        notificationService.notify({
+        await notificationService.notify({
           recipient_role: ROLES.ADMIN,
           title: 'Completion Verified by Officer',
           message: `Officer ${req.user.id} verified completion of problem #${problem.id}. Ready for final admin closure.`,
@@ -1337,7 +1393,7 @@ app.post(
           problem,
         });
       } else {
-        transitionProblemStatus(
+        await transitionProblemStatus(
           problem,
           INTERNAL_STATUS.WORK_IN_PROGRESS,
           req.user,
@@ -1346,7 +1402,7 @@ app.post(
           store
         );
 
-        notificationService.notify({
+        await notificationService.notify({
           recipient_role: ROLES.ADMIN,
           title: 'Work Incomplete',
           message: `Officer ${req.user.id} verified problem #${problem.id} is not yet finished. Returned to IN_PROGRESS.`,
@@ -1372,12 +1428,12 @@ app.post(
 // 4. NOTIFICATIONS
 // ==========================================
 
-app.get('/api/notifications', (req, res) => {
+app.get('/api/notifications', async (req, res) => {
   const role = req.user?.role;
   const userId = req.user?.id;
   const unreadOnly = req.query.unread === 'true';
 
-  const userNotifs = notificationService.getForUser({
+  const userNotifs = await notificationService.getForUser({
     role,
     user_id: userId,
     unread_only: unreadOnly,
@@ -1386,8 +1442,8 @@ app.get('/api/notifications', (req, res) => {
   res.json({ success: true, count: userNotifs.length, notifications: userNotifs });
 });
 
-app.post('/api/notifications/:id/read', (req, res) => {
-  const updated = notificationService.markRead(req.params.id);
+app.post('/api/notifications/:id/read', async (req, res) => {
+  const updated = await notificationService.markRead(req.params.id);
   if (!updated) {
     return res.status(404).json({ success: false, error: 'Notification not found' });
   }
@@ -1431,7 +1487,7 @@ app.post('/api/priority', async (req, res) => {
 // Calculate or override priority for a specific problem (e.g. Officer verification update)
 app.post('/api/problems/:id/priority', async (req, res) => {
   try {
-    const problem = store.getById(req.params.id);
+    const problem = await store.getById(req.params.id);
     if (!problem) {
       return res.status(404).json({ success: false, error: 'Problem not found' });
     }
@@ -1454,6 +1510,9 @@ app.post('/api/problems/:id/priority', async (req, res) => {
     if (overrides.criticality != null) problem.criticality = overrides.criticality;
     problem.priority_analysis = priorityResult;
 
+    await store.saveAIAnalysis(problem.id, priorityResult);
+    await store.save(problem);
+
     res.json({
       success: true,
       problem_id: problem.id,
@@ -1462,6 +1521,23 @@ app.post('/api/problems/:id/priority', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Test helper: Reset store and notifications to baseline
+app.post('/api/test/reset', async (_req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_TEST_ENDPOINTS !== 'true') {
+    return res.status(403).json({
+      success: false,
+      error: 'Test endpoints are disabled in production mode.',
+    });
+  }
+  try {
+    await store.resetToInitial();
+    await notificationService.reset();
+    res.json({ success: true, message: 'Store and notifications reset to baseline successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

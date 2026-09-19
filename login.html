@@ -175,6 +175,29 @@
 
           <form class="lp-form" id="lpForm" novalidate autocomplete="on">
 
+            <!-- Full Name (Citizen Registration) -->
+            <div class="lp-field-group" id="lpNameGroup" style="display: none;">
+              <label class="lp-label" for="lpName">Full Name</label>
+              <div class="lp-input-wrap">
+                <span class="lp-input-icon" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+                    <circle cx="8.5" cy="5.5" r="3.5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M2.5 15c0-3 2.5-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  id="lpName"
+                  name="name"
+                  class="lp-input"
+                  placeholder="Enter your full name"
+                  autocomplete="name"
+                  aria-describedby="lpNameError"
+                />
+              </div>
+              <span class="lp-field-error" id="lpNameError" role="alert"></span>
+            </div>
+
             <!-- Email / Username -->
             <div class="lp-field-group">
               <label class="lp-label" for="lpEmail">Email / Username</label>
@@ -243,7 +266,7 @@
             </div>
 
             <!-- Remember Me + Forgot Password -->
-            <div class="lp-form-row">
+            <div class="lp-form-row" id="lpRememberRow">
               <label class="lp-checkbox-label">
                 <input type="checkbox" id="lpRemember" name="remember" class="lp-checkbox" />
                 <span class="lp-checkbox-custom" aria-hidden="true"></span>
@@ -254,7 +277,7 @@
 
             <!-- Submit Button -->
             <button type="submit" class="lp-submit-btn" id="lpSubmit">
-              <span class="lp-submit-text">
+              <span class="lp-submit-text" id="lpSubmitText">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                   <path d="M15 9H3M10 4l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -268,6 +291,12 @@
                 Authenticating…
               </span>
             </button>
+
+            <!-- Mode Toggle: Sign In vs Sign Up (Citizens only) -->
+            <div class="lp-toggle-mode" id="lpToggleMode" style="margin-top: 14px; text-align: center; font-size: 13px;">
+              <span id="lpTogglePrompt" style="color: var(--text-muted, #64748B);">Don't have a citizen account?</span>
+              <a href="#" id="lpToggleLink" style="color: #1565C0; font-weight: 600; text-decoration: none; margin-left: 5px;">Sign Up</a>
+            </div>
 
           </form><!-- /lp-form -->
 

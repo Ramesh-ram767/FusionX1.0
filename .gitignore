@@ -10,3 +10,6 @@ _engine_extract/
 _backup_simple/
 backend-engine/
 *.log
+.env
+*.env
+.env.*

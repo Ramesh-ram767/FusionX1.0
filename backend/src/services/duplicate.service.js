@@ -29,7 +29,7 @@ export async function checkDuplicateReports({
   radiusMeters = DUPLICATE_RADIUS_METERS,
   threshold = IMAGE_SIMILARITY_THRESHOLD,
 }) {
-  const problems = existingProblems || store.getOpen();
+  const problems = existingProblems || (await store.getOpen());
   const hasGeo = latitude != null && longitude != null;
   const hasQueryImage = Boolean(image_path && fs.existsSync(image_path));
 
